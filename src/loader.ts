@@ -246,18 +246,27 @@ export async function loadApp<T extends ObjectType>(
   configuration: FrameworkConfiguration = {},
   lifeCycles?: FrameworkLifeCycles<T>,
 ): Promise<ParcelConfigObjectGetter> {
+  // 获取基础配置
   const { entry, name: appName } = app;
+  // 创建应用id {{appName}}_1632384359678_440
   const appInstanceId = `${appName}_${+new Date()}_${Math.floor(Math.random() * 1000)}`;
-
+  // 标记当前name
   const markName = `[qiankun] App ${appInstanceId} Loading`;
+  // 生产环境 标记一下打印一些输出日志啥的
   if (process.env.NODE_ENV === 'development') {
     performanceMark(markName);
   }
-
+  // 取出start方法参数、包含一些应用的配置比如开启沙箱、预加载其他微应用、是否为单实例场景、getPublicPath 、getTemplate ....
   const { singular = false, sandbox = true, excludeAssetFilter, ...importEntryOpts } = configuration;
-
-  // get the entry html content and script executor
-  const { template, execScripts, assetPublicPath } = await importEntry(entry, importEntryOpts);
+  /* 
+    获取入口html内容和脚本执行器 assetPublicPath='你传入的entry地址'  获取子应用资源 - import-html-entry
+    template:被处理后的html模板字符串，外联的样式文件被替换为内联样式
+    assetPublicPath: 静态资源的baseURL
+    getExternalScripts(promise):将模板中所有script标签按照出现的先后顺序，提取出内容，组成一个数组
+    getExternalStyleSheets(promise):将模板中所有link和style标签按照出现的先后顺序，提取出内容，组成一个数组
+    execScripts(promise) 执行所有的script中的代码，并返回为html模板入口脚本链接entry指向的模块导出对象。
+  */
+  const { template, execScripts, assetPublicPath } = await importEntry(entry, importEntryOpts); // importEntry插件学习： https://blog.csdn.net/daihaoxin/article/details/106250617
 
   // as single-spa load and bootstrap new app parallel with other apps unmounting
   // (see https://github.com/CanopyTax/single-spa/blob/master/src/navigation/reroute.js#L74)
@@ -265,11 +274,13 @@ export async function loadApp<T extends ObjectType>(
   if (await validateSingularMode(singular, app)) {
     await (prevAppUnmountedDeferred && prevAppUnmountedDeferred.promise);
   }
-
+  // 对应用template节点进行二次封装、包裹一层qiankun的元素
   const appContent = getDefaultTplWrapper(appInstanceId, appName)(template);
-
+  // 是否开启严格的样式隔离模式
   const strictStyleIsolation = typeof sandbox === 'object' && !!sandbox.strictStyleIsolation;
+  // 开启css隔离
   const scopedCSS = isEnableScopedCSS(sandbox);
+  // 创建应用整体元素
   let initialAppWrapperElement: HTMLElement | null = createElement(
     appContent,
     strictStyleIsolation,
@@ -278,10 +289,10 @@ export async function loadApp<T extends ObjectType>(
   );
 
   const initialContainer = 'container' in app ? app.container : undefined;
+
   const legacyRender = 'render' in app ? app.render : undefined;
-
   const render = getRender(appName, appContent, legacyRender);
-
+  console.log('render', render);
   // 第一次加载设置应用可见区域 dom 结构
   // 确保每次应用加载前容器 dom 结构已经设置完毕
   render({ element: initialAppWrapperElement, loading: true, container: initialContainer }, 'loading');
@@ -300,6 +311,7 @@ export async function loadApp<T extends ObjectType>(
   let unmountSandbox = () => Promise.resolve();
   const useLooseSandbox = typeof sandbox === 'object' && !!sandbox.loose;
   let sandboxContainer;
+  // 开始沙箱
   if (sandbox) {
     sandboxContainer = createSandboxContainer(
       appName,

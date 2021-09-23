@@ -41,31 +41,41 @@ export function registerMicroApps<T extends ObjectType>(
   apps: Array<RegistrableApp<T>>,
   lifeCycles?: FrameworkLifeCycles<T>,
 ) {
-  console.log('会吗registerMicroApps');
-  // Each app only needs to be registered once
+  // 每个应用只需要注册一次就好
   const unregisteredApps = apps.filter((app) => !microApps.some((registeredApp) => registeredApp.name === app.name));
-
+  // 合并注册表
   microApps = [...microApps, ...unregisteredApps];
-
+  // 然后遍历组装single-spa需要的参数、调用registerApplication依次注册
   unregisteredApps.forEach((app) => {
     const { name, activeRule, loader = noop, props, ...appConfig } = app;
-
+    // 调用single-spa方法进行注册
     registerApplication({
+      // 应用名称
       name,
+      // 返回应用实例
       app: async () => {
+        // loading 状态发生变化时会调用的方法
         loader(true);
+        // 同步方法标记
         await frameworkStartedDefer.promise;
-
-        const { mount, ...otherMicroAppConfigs } = (
-          await loadApp({ name, props, ...appConfig }, frameworkConfiguration, lifeCycles)
-        )();
+        // 拦截应用、并返回single-spa需要的应用函数、这里开始处理沙箱和应用挂载节点操作
+        const { mount, ...otherMicroAppConfigs } = /*
+            name 应用名称
+            props 应用初始化获得的props
+            appConfig 其他配置参数
+            frameworkConfiguration 应用的配置信息、包括一些沙箱的开启等等
+            lifeCycles 应用的生命周期
+          */
+        (await loadApp({ name, props, ...appConfig }, frameworkConfiguration, lifeCycles))();
 
         return {
           mount: [async () => loader(true), ...toArray(mount), async () => loader(false)],
           ...otherMicroAppConfigs,
         };
       },
+      // 激活规则
       activeWhen: activeRule,
+      // 在生命周期钩子函数执行时会被作为参数传入
       customProps: props,
     });
   });
@@ -213,15 +223,15 @@ export function start(opts: FrameworkConfiguration = {}) {
     urlRerouteOnly = defaultUrlRerouteOnly,
     ...importEntryOpts
   } = frameworkConfiguration;
-
+  // 是否开启预加载
   if (prefetch) {
     doPrefetchStrategy(microApps, prefetch, importEntryOpts);
   }
-
+  // 低版本浏览器自动降级、判断没有window.Proxy属性的话、
   frameworkConfiguration = autoDowngradeForLowVersionBrowser(frameworkConfiguration);
-
+  // 执行startSingleSpa
   startSingleSpa({ urlRerouteOnly });
   started = true;
-
+  // 标记开始运行
   frameworkStartedDefer.resolve();
 }
