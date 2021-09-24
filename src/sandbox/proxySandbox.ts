@@ -64,9 +64,9 @@ type FakeWindow = Window & Record<PropertyKey, any>;
 function createFakeWindow(global: Window) {
   // map always has the fastest performance in has check scenario
   // see https://jsperf.com/array-indexof-vs-set-has/23
-  // 通过实践、Map性能要优于普通对象
+  // 通过实践、Map性能要优于普通对象1111
   const propertiesWithGetter = new Map<PropertyKey, boolean>();
-  // 创建window副本对象
+  // 创建window副本对象222
   const fakeWindow = {} as FakeWindow;
 
   /*
