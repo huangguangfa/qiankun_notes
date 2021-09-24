@@ -64,7 +64,9 @@ type FakeWindow = Window & Record<PropertyKey, any>;
 function createFakeWindow(global: Window) {
   // map always has the fastest performance in has check scenario
   // see https://jsperf.com/array-indexof-vs-set-has/23
+  // 通过实践、Map性能要优于普通对象
   const propertiesWithGetter = new Map<PropertyKey, boolean>();
+  // 创建window副本对象
   const fakeWindow = {} as FakeWindow;
 
   /*
@@ -72,6 +74,7 @@ function createFakeWindow(global: Window) {
    see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy/handler/getOwnPropertyDescriptor
    > A property cannot be reported as non-configurable, if it does not exists as an own property of the target object or if it exists as a configurable own property of the target object.
    */
+  // 主要做对全局不可变更的对象属性在快照fakeWindow也保持一致
   Object.getOwnPropertyNames(global)
     .filter((p) => {
       const descriptor = Object.getOwnPropertyDescriptor(global, p);
@@ -81,7 +84,6 @@ function createFakeWindow(global: Window) {
       const descriptor = Object.getOwnPropertyDescriptor(global, p);
       if (descriptor) {
         const hasGetter = Object.prototype.hasOwnProperty.call(descriptor, 'get');
-
         /*
          make top/self/window property configurable and writable, otherwise it will cause TypeError while get trap return.
          see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy/handler/get

@@ -72,8 +72,9 @@ export default class SingularProxySandbox implements SandBox {
     this.name = name;
     this.type = SandBoxType.LegacyProxy;
     const { addedPropsMapInSandbox, modifiedPropsOriginalValueMapInSandbox, currentUpdatedPropsValueMap } = this;
-
+    // 保存window
     const rawWindow = window;
+    // 创建一个window副本对象
     const fakeWindow = Object.create(null) as Window;
 
     const setTrap = (p: PropertyKey, value: any, originalValue: any, sync2Window = true) => {
@@ -118,17 +119,16 @@ export default class SingularProxySandbox implements SandBox {
         if (p === 'top' || p === 'parent' || p === 'window' || p === 'self') {
           return proxy;
         }
-
         const value = (rawWindow as any)[p];
+        // 代理如果是变量的话直接返回变量、方法的话会缓存到callableFnCacheMap
         return getTargetValue(rawWindow, value);
       },
 
-      // trap in operator
-      // see https://github.com/styled-components/styled-components/blob/master/packages/styled-components/src/constants.js#L12
+      // 针对 in 操作符的代理方法。
       has(_: Window, p: string | number | symbol): boolean {
         return p in rawWindow;
       },
-
+      // 返回指定对象上一个自有属性对应的属性描述符
       getOwnPropertyDescriptor(_: Window, p: PropertyKey): PropertyDescriptor | undefined {
         const descriptor = Object.getOwnPropertyDescriptor(rawWindow, p);
         // A property cannot be reported as non-configurable, if it does not exists as an own property of the target object
@@ -137,7 +137,7 @@ export default class SingularProxySandbox implements SandBox {
         }
         return descriptor;
       },
-
+      // 用于拦截对对象的 Object.defineProperty() 操作
       defineProperty(_: Window, p: string | symbol, attributes: PropertyDescriptor): boolean {
         const originalValue = (rawWindow as any)[p];
         const done = Reflect.defineProperty(rawWindow, p, attributes);

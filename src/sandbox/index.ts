@@ -35,6 +35,12 @@ export function createSandboxContainer(
   useLooseSandbox?: boolean,
   excludeAssetFilter?: (url: string) => boolean,
 ) {
+  // 一共三种沙箱模式 LegacySandbox ProxySandbox 还有兼容IE的SnapshotSandbox
+  /* 
+    LegacySandbox(单例模式的兼容)：
+        保存window变量且创建一个fakeWindow对象并对该对象进行劫持操作、 包括一系列得get set in has getOwnPropertyDescriptor defineProperty等进行拦截、全部走proxy代理
+        
+  */
   let sandbox: SandBox;
   if (window.Proxy) {
     sandbox = useLooseSandbox ? new LegacySandbox(appName) : new ProxySandbox(appName);

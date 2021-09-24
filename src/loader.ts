@@ -60,7 +60,7 @@ async function validateSingularMode<T extends ObjectType>(
   return typeof validate === 'function' ? validate(app) : !!validate;
 }
 
-// @ts-ignore
+// 获取独立封装html
 const supportShadowDOM = document.head.attachShadow || document.head.createShadowRoot;
 
 function createElement(
@@ -108,7 +108,7 @@ function createElement(
   return appElement;
 }
 
-/** generate app wrapper dom getter */
+/** 主要是返回应用独立的html包裹 */
 function getAppWrapperGetter(
   appName: string,
   appInstanceId: string,
@@ -118,6 +118,7 @@ function getAppWrapperGetter(
   elementGetter: () => HTMLElement | null,
 ) {
   return () => {
+    // use render逻辑
     if (useLegacyRender) {
       if (strictStyleIsolation) throw new QiankunError('strictStyleIsolation can not be used with legacy render!');
       if (scopedCSS) throw new QiankunError('experimentalStyleIsolation can not be used with legacy render!');
@@ -126,14 +127,16 @@ function getAppWrapperGetter(
       assertElementExist(appWrapper, `Wrapper element for ${appName} with instance ${appInstanceId} is not existed!`);
       return appWrapper!;
     }
-
+    // 获取应用节点
     const element = elementGetter();
+    // 检查元素是否在不在就抛出异常
     assertElementExist(element, `Wrapper element for ${appName} with instance ${appInstanceId} is not existed!`);
-
+    // 开启严格模式逻辑 、判断是否支持独立封装html
     if (strictStyleIsolation && supportShadowDOM) {
+      // 返回这个封装独立的html
       return element!.shadowRoot!;
     }
-
+    // 返回应用节点
     return element!;
   };
 }
@@ -152,8 +155,10 @@ type ElementRender = (
  * @param appContent
  * @param legacyRender
  */
+// render主要做应用元素节点挂载到容器节点的操作、同时做一些条件的判断比如是否用户有自己的render、如果有统一走用户的render、
 function getRender(appName: string, appContent: string, legacyRender?: HTMLContentRender) {
   const render: ElementRender = ({ element, loading, container }, phase) => {
+    // 如果使用use的render就直接return出去
     if (legacyRender) {
       if (process.env.NODE_ENV === 'development') {
         console.warn(
@@ -163,11 +168,11 @@ function getRender(appName: string, appContent: string, legacyRender?: HTMLConte
 
       return legacyRender({ loading, appContent: element ? appContent : '' });
     }
-
+    // 获取应用插入的节点dom
     const containerElement = getContainer(container!);
-
     // The container might have be removed after micro app unmounted.
     // Such as the micro app unmount lifecycle called by a react componentWillUnmount lifecycle, after micro app unmounted, the react component might also be removed
+    // 卸载容器的报错日志
     if (phase !== 'unmounted') {
       const errorMsg = (() => {
         switch (phase) {
@@ -184,14 +189,14 @@ function getRender(appName: string, appContent: string, legacyRender?: HTMLConte
       })();
       assertElementExist(containerElement, errorMsg);
     }
-
+    // 获取到容器元素、且当前应用元素并没有挂载到容器元素
     if (containerElement && !containerElement.contains(element)) {
-      // clear the container
+      // 清空容器
       while (containerElement!.firstChild) {
         rawRemoveChild.call(containerElement, containerElement!.firstChild);
       }
 
-      // append the element to container if it exist
+      // 把应用元素插入到容器
       if (element) {
         rawAppendChild.call(containerElement, element);
       }
@@ -287,16 +292,15 @@ export async function loadApp<T extends ObjectType>(
     scopedCSS,
     appName,
   );
-
+  // 获取容器节点名称
   const initialContainer = 'container' in app ? app.container : undefined;
-
+  // 判断是否存在render
   const legacyRender = 'render' in app ? app.render : undefined;
+  // 获取挂载应用节点方法
   const render = getRender(appName, appContent, legacyRender);
-  console.log('render', render);
-  // 第一次加载设置应用可见区域 dom 结构
-  // 确保每次应用加载前容器 dom 结构已经设置完毕
+  // 挂载应用节点到页面上
   render({ element: initialAppWrapperElement, loading: true, container: initialContainer }, 'loading');
-
+  // 获取生成shadowRoot应用节点 或者html节点
   const initialAppWrapperGetter = getAppWrapperGetter(
     appName,
     appInstanceId,
@@ -305,14 +309,18 @@ export async function loadApp<T extends ObjectType>(
     scopedCSS,
     () => initialAppWrapperElement,
   );
-
+  // 把window赋值global
   let global = window;
+  // 挂载Sandbox promise
   let mountSandbox = () => Promise.resolve();
+  // 卸载Sanbox promise
   let unmountSandbox = () => Promise.resolve();
+  // 校验用户在start中传入的sandbox，不传的话默认为true。如果你写成了对象，则校验有没有loose这个属性。这个loose属性我好像没有在官方文档上看到对于它的使用说明
   const useLooseSandbox = typeof sandbox === 'object' && !!sandbox.loose;
   let sandboxContainer;
   // 开始沙箱
   if (sandbox) {
+    // 创建沙箱容器、传入appName(应用名称) initialAppWrapperGetter(shadowRoot应用节点 或者html节点) scopedCSS(css作用域隔离) useLooseSandbox
     sandboxContainer = createSandboxContainer(
       appName,
       // FIXME should use a strict sandbox logic while remount, see https://github.com/umijs/qiankun/issues/518
@@ -321,6 +329,7 @@ export async function loadApp<T extends ObjectType>(
       useLooseSandbox,
       excludeAssetFilter,
     );
+    console.log('sandboxContainer', sandboxContainer);
     // 用沙箱的代理对象作为接下来使用的全局对象
     global = sandboxContainer.instance.proxy as typeof window;
     mountSandbox = sandboxContainer.mount;
