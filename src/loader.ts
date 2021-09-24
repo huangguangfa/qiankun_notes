@@ -61,6 +61,7 @@ async function validateSingularMode<T extends ObjectType>(
 }
 
 // 获取独立封装html
+// @ts-ignore
 const supportShadowDOM = document.head.attachShadow || document.head.createShadowRoot;
 
 function createElement(
